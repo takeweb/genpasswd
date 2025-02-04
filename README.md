@@ -9,8 +9,7 @@ cargo add rand_distr
 
 ## コマンドのインストール
 ```
-cargo build --release
-cp target/release/genpasswd ~/bin/
+cargo install genpasswd
 ```
 
 ## 使い方
