@@ -7,9 +7,9 @@ cargo add rand
 cargo add rand_distr
 ```
 
-## コマンドのインストール
+## コマンドのインストール crate.ioに同名のコマンドが存在する為、カレントパスをインストールするように指定
 ```
-cargo install genpasswd
+cargo install --path .
 ```
 
 ## 使い方
