@@ -62,6 +62,8 @@ cargo build-win   # → target/x86_64-pc-windows-gnu/release/genpasswd_ex.exe
 
 `cargo build-mac` / `cargo build-win` は `.cargo/config.toml` に定義したエイリアスです。
 
+`--target` を付けない `cargo build --release` は、**ビルドしているマシン自身（ホスト）向け**のバイナリになり、`target/release/` に出力されます（Apple Silicon の Mac なら `aarch64-apple-darwin`、Windows なら通常 `x86_64-pc-windows-msvc`）。`cargo build-mac` との違いはターゲットを明示するかどうかと出力先だけで、Apple Silicon の Mac 上ではどちらも同じ Mac 用バイナリになります。
+
 | コマンド | ターゲット | 出力先 |
 |---|---|---|
 | `cargo build-mac` | macOS (Apple Silicon) | `target/aarch64-apple-darwin/release/genpasswd_ex` |
