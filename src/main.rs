@@ -173,13 +173,24 @@ fn load_cipher() -> crypto::Cipher {
     })
 }
 
+/// データディレクトリ（Windows: `%APPDATA%\genpasswd_ex` / それ以外: `~/.local/share/genpasswd_ex`）
+#[cfg(windows)]
+fn data_dir() -> PathBuf {
+    dirs::data_dir().expect("Cannot determine data directory").join("genpasswd_ex")
+}
+
+#[cfg(not(windows))]
+fn data_dir() -> PathBuf {
+    let home = dirs::home_dir().expect("Cannot determine home directory");
+    home.join(".local/share/genpasswd_ex")
+}
+
 fn db_path() -> PathBuf {
     if let Ok(path) = std::env::var("GENPASSWD_EX_DB") {
         return PathBuf::from(path);
     }
 
-    let home = dirs::home_dir().expect("Cannot determine home directory");
-    let dir = home.join(".local/share/genpasswd_ex");
+    let dir = data_dir();
     std::fs::create_dir_all(&dir).expect("Failed to create data directory");
     #[cfg(unix)]
     {

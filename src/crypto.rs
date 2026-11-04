@@ -21,7 +21,8 @@ pub struct Cipher {
 
 impl Cipher {
     /// 鍵を読み込む。環境変数 `GENPASSWD_EX_KEY`（base64）があれば優先し、
-    /// なければキーチェーンから取得する（未登録なら生成して登録する）
+    /// なければ OS の鍵ストア（macOS: キーチェーン / Windows: 資格情報マネージャー）から取得する
+    /// （未登録なら生成して登録する）
     pub fn load() -> Result<Self, String> {
         let key = match std::env::var("GENPASSWD_EX_KEY") {
             Ok(b64) => B64
@@ -95,13 +96,79 @@ mod keychain {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+/// Windows の資格情報マネージャー（汎用資格情報、ターゲット名 `<service>:<account>`）に鍵を保存する
+#[cfg(windows)]
+mod keychain {
+    use std::ptr;
+    use windows_sys::Win32::Foundation::{ERROR_NOT_FOUND, GetLastError};
+    use windows_sys::Win32::Security::Credentials::{
+        CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC, CREDENTIALW, CredFree, CredReadW, CredWriteW,
+    };
+
+    fn wide(s: &str) -> Vec<u16> {
+        s.encode_utf16().chain(std::iter::once(0)).collect()
+    }
+
+    pub fn load_or_create(
+        service: &str,
+        account: &str,
+        generate: impl FnOnce() -> Vec<u8>,
+    ) -> Result<Vec<u8>, String> {
+        let target = format!("{}:{}", service, account);
+        let mut target_w = wide(&target);
+        let mut user_w = wide(account);
+
+        let mut cred: *mut CREDENTIALW = ptr::null_mut();
+        // SAFETY: target_w は NUL 終端の UTF-16。成功時の cred は CredFree で解放する
+        let ok = unsafe { CredReadW(target_w.as_ptr(), CRED_TYPE_GENERIC, 0, &mut cred) };
+        if ok != 0 {
+            let key = unsafe {
+                let c = &*cred;
+                let blob = std::slice::from_raw_parts(c.CredentialBlob, c.CredentialBlobSize as usize).to_vec();
+                CredFree(cred as *const _);
+                blob
+            };
+            return Ok(key);
+        }
+
+        let err = unsafe { GetLastError() };
+        // 未登録の場合のみ新規作成する（その他のエラーで既存の鍵を上書きしないため）
+        if err != ERROR_NOT_FOUND {
+            return Err(format!("failed to read key from credential manager (error {})", err));
+        }
+
+        let mut key = generate();
+        let new_cred = CREDENTIALW {
+            Flags: 0,
+            Type: CRED_TYPE_GENERIC,
+            TargetName: target_w.as_mut_ptr(),
+            Comment: ptr::null_mut(),
+            LastWritten: unsafe { std::mem::zeroed() },
+            CredentialBlobSize: key.len() as u32,
+            CredentialBlob: key.as_mut_ptr(),
+            Persist: CRED_PERSIST_LOCAL_MACHINE,
+            AttributeCount: 0,
+            Attributes: ptr::null_mut(),
+            TargetAlias: ptr::null_mut(),
+            UserName: user_w.as_mut_ptr(),
+        };
+        // SAFETY: new_cred が参照するバッファはこの呼び出しの間生きている
+        if unsafe { CredWriteW(&new_cred, 0) } == 0 {
+            let err = unsafe { GetLastError() };
+            return Err(format!("failed to save key to credential manager (error {})", err));
+        }
+        eprintln!("Created encryption key in Windows Credential Manager ({}).", target);
+        Ok(key)
+    }
+}
+
+#[cfg(not(any(target_os = "macos", windows)))]
 mod keychain {
     pub fn load_or_create(
         _service: &str,
         _account: &str,
         _generate: impl FnOnce() -> Vec<u8>,
     ) -> Result<Vec<u8>, String> {
-        Err("keychain is only supported on macOS; set GENPASSWD_EX_KEY instead".to_string())
+        Err("keychain is only supported on macOS and Windows; set GENPASSWD_EX_KEY instead".to_string())
     }
 }
