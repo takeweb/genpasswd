@@ -4,7 +4,9 @@
 
 ## 構成
 
-- `src/main.rs` — CLI 定義（clap derive）とサブコマンド処理
+- `src/main.rs` — エントリーポイント（引数を解析してサブコマンドに振り分けるだけ）
+- `src/cli.rs` — CLI 定義（clap derive）
+- `src/commands/` — サブコマンドの処理（1 コマンド 1 ファイル、各 `run()`）。引数なしの生成は `generate.rs`。共通ヘルパー（`open_db` / `load_cipher` / `resolve_username` / DB パス解決など）は `commands/mod.rs`
 - `src/db.rs` — SQLite アクセス（`password_history` テーブル）
 - `src/password.rs` — パスワード生成
 - `src/crypto.rs` — パスワードの暗号化/復号（AES-256-GCM）と鍵の取得（macOS キーチェーン / Windows 資格情報マネージャー）
