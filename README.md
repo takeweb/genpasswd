@@ -22,22 +22,48 @@ cargo build --release
 
 バイナリは `target/release/genpasswd_ex` に生成されます。
 
+### ターゲット別ビルド（macOS / Windows）
+
+`.cargo/config.toml` にエイリアスを定義しています。
+
+| コマンド | ターゲット | 出力先 |
+|---|---|---|
+| `cargo build-mac` | macOS (Apple Silicon) | `target/aarch64-apple-darwin/release/genpasswd_ex` |
+| `cargo build-win` | Windows (x86_64) | `target/x86_64-pc-windows-gnu/release/genpasswd_ex.exe` |
+
+macOS から Windows 版をクロスコンパイルするには、事前に次の準備が必要です。
+
+```
+brew install mingw-w64
+rustup target add x86_64-pc-windows-gnu
+```
+
+Windows 上でビルドする場合は、Rust と Visual Studio Build Tools（C++）を入れて `cargo build --release` を実行してください（`target\release\genpasswd_ex.exe` に生成されます）。
+
 ## データ保存先
 
-```
-~/.local/share/genpasswd_ex/history.db
-```
+| OS | パス |
+|---|---|
+| macOS / Linux | `~/.local/share/genpasswd_ex/history.db` |
+| Windows | `%APPDATA%\genpasswd_ex\history.db` |
 
-ディレクトリは `700`、DBファイルは `600`（所有者のみ読み書き可）に設定されます。既存のファイルも実行時に同じ権限へ変更されます。
+macOS / Linux では、ディレクトリは `700`、DBファイルは `600`（所有者のみ読み書き可）に設定されます。既存のファイルも実行時に同じ権限へ変更されます。
+
+DB と暗号化鍵は端末ごとに別管理です（macOS と Windows で DB を共有する想定はしていません）。
 
 ## 暗号化
 
-パスワードは AES-256-GCM で暗号化して DB に保存されます。暗号化鍵は macOS のキーチェーン（サービス `genpasswd_ex` / アカウント `db-key`）に保存され、初回の保存時に自動で作成されます。
+パスワードは AES-256-GCM で暗号化して DB に保存されます。暗号化鍵は OS の鍵ストアに保存され、初回の保存時に自動で作成されます。
+
+| OS | 保存先 |
+|---|---|
+| macOS | キーチェーン（サービス `genpasswd_ex` / アカウント `db-key`） |
+| Windows | 資格情報マネージャーの汎用資格情報（ターゲット名 `genpasswd_ex:db-key`） |
 
 - `history` では復号して表示するため、使い方は変わりません
-- 再インストール後などは、初回アクセス時にキーチェーンへのアクセス許可ダイアログが表示されます（「常に許可」を選ぶと以後は表示されません）
-- **キーチェーンの鍵を削除すると、保存済みのパスワードは復号できなくなります**
-- macOS 以外では、環境変数 `GENPASSWD_EX_KEY` に base64 の 32 バイト鍵を指定してください（`openssl rand -base64 32` で生成可）
+- macOS では、再インストール後などは初回アクセス時にキーチェーンへのアクセス許可ダイアログが表示されます（「常に許可」を選ぶと以後は表示されません）
+- **鍵ストアの鍵を削除すると、保存済みのパスワードは復号できなくなります**
+- macOS / Windows 以外では、環境変数 `GENPASSWD_EX_KEY` に base64 の 32 バイト鍵を指定してください（`openssl rand -base64 32` で生成可）
 
 旧バージョンで保存した平文のパスワードもそのまま表示できます。暗号化するには次を実行してください（念のため事前に DB をバックアップしてください）。
 
@@ -72,7 +98,7 @@ Generated password: ]]:dwmstZjQ9scuU1qLRLgLQ
 Copied to clipboard.
 ```
 
-生成されたパスワードは自動でクリップボードにコピーされます（macOS は `pbcopy`、Linux は `wl-copy` / `xclip` / `xsel` を使用）。コピーに失敗した場合は警告を表示し、処理は続行します。
+生成されたパスワードは自動でクリップボードにコピーされます（macOS は `pbcopy`、Windows はクリップボード API、Linux は `wl-copy` / `xclip` / `xsel` を使用）。コピーに失敗した場合は警告を表示し、処理は続行します。
 
 ---
 
