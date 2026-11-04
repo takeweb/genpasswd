@@ -3,12 +3,18 @@
 //! main.rs はエントリーポイントで、引数を解析して各サブコマンドの処理
 //! （`commands/<名前>.rs` の `run()`）に振り分けるだけにしている。
 
-mod cli; // CLI 定義（clap derive）
-mod clipboard; // クリップボードへのコピー（OS ごとに実装を切り替え）
-mod commands; // サブコマンドの処理（1 コマンド 1 ファイル）と共通ヘルパー
-mod crypto; // パスワードの暗号化/復号と鍵の取得（キーチェーン / 資格情報マネージャー）
-mod db; // SQLite アクセス（password_history テーブル）
-mod password; // パスワード生成
+// CLI 定義（clap derive）
+mod cli;
+// クリップボードへのコピー（OS ごとに実装を切り替え）
+mod clipboard;
+// サブコマンドの処理（1 コマンド 1 ファイル）と共通ヘルパー
+mod commands;
+// パスワードの暗号化/復号と鍵の取得（キーチェーン / 資格情報マネージャー）
+mod crypto;
+// SQLite アクセス（password_history テーブル）
+mod db;
+// パスワード生成
+mod password;
 
 use clap::Parser;
 use cli::{Args, Command};
