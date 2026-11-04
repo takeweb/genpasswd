@@ -17,7 +17,8 @@ use clap::{ArgGroup, Parser, Subcommand};
   genpasswd_ex delete -s <SERVICE>
   genpasswd_ex update <ID> [-u <USERNAME>] [-p '<PASSWORD>']
 
-Passwords are encrypted with a key stored in the macOS keychain.
+Passwords are encrypted with a key stored in the OS key store
+(macOS: Keychain / Windows: Credential Manager; otherwise set GENPASSWD_EX_KEY).
 
 Run 'genpasswd_ex <COMMAND> -h' for command-specific options."
 )]
