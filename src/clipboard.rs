@@ -1,8 +1,15 @@
-use std::io::Write;
-use std::process::{Command, Stdio};
+/// OS のクリップボードにテキストをコピーする
+#[cfg(windows)]
+pub fn copy(text: &str) -> Result<(), String> {
+    clipboard_win::set_clipboard_string(text).map_err(|e| format!("clipboard: {}", e))
+}
 
 /// OS のクリップボードコマンドにテキストを渡してコピーする
+#[cfg(not(windows))]
 pub fn copy(text: &str) -> Result<(), String> {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
     let candidates: &[(&str, &[&str])] = if cfg!(target_os = "macos") {
         &[("pbcopy", &[])]
     } else {

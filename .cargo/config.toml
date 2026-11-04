@@ -1,0 +1,6 @@
+# ターゲット別のビルド用エイリアス
+#   cargo build-mac  … macOS (Apple Silicon) 向け release ビルド
+#   cargo build-win  … Windows (x86_64, mingw) 向け release ビルド（macOS からのクロスコンパイル可）
+[alias]
+build-mac = "build --release --target aarch64-apple-darwin"
+build-win = "build --release --target x86_64-pc-windows-gnu"
