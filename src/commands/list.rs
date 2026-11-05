@@ -1,6 +1,6 @@
 //! `list`: サービス一覧と件数を表示する
 
-use super::open_db;
+use super::{format_tags, open_db};
 use unicode_width::UnicodeWidthStr;
 
 pub fn run() {
@@ -16,10 +16,12 @@ pub fn run() {
         .max()
         .unwrap_or(0)
         .max("Service".len());
-    println!("{}  Count", pad("Service", col));
-    println!("{}", "-".repeat(col + 8));
+    println!("{}  Count  Tags", pad("Service", col));
+    println!("{}", "-".repeat(col + 20));
     for (svc, cnt) in &services {
-        println!("{}  {:>5}", pad(svc, col), cnt);
+        let tags = db.tags_of(svc).expect("Failed to read tags");
+        let line = format!("{}  {:>5}  {}", pad(svc, col), cnt, format_tags(&tags));
+        println!("{}", line.trim_end());
     }
 }
 

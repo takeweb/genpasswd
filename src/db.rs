@@ -44,7 +44,12 @@ impl Db {
                 created_at TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_service
-                ON password_history(service);",
+                ON password_history(service);
+            CREATE TABLE IF NOT EXISTS service_tags (
+                service TEXT NOT NULL,
+                tag     TEXT NOT NULL,
+                PRIMARY KEY (service, tag)
+            );",
         )?;
 
         // 既存DBにusernameカラムがなければ追加
@@ -169,12 +174,22 @@ impl Db {
         )
     }
 
-    /// サービス名を変更（変更した件数を返す）
+    /// サービス名を変更（変更した件数を返す）。タグも新しいサービス名に引き継ぐ（統合時は和集合）
     pub fn rename_service(&self, old: &str, new: &str) -> Result<usize> {
-        let n = self.conn.execute(
+        let tx = self.conn.unchecked_transaction()?;
+        let n = tx.execute(
             "UPDATE password_history SET service = ?2 WHERE service = ?1",
             params![old, new],
         )?;
+        if n > 0 {
+            tx.execute(
+                "INSERT OR IGNORE INTO service_tags (service, tag)
+                 SELECT ?2, tag FROM service_tags WHERE service = ?1",
+                params![old, new],
+            )?;
+            tx.execute("DELETE FROM service_tags WHERE service = ?1", params![old])?;
+        }
+        tx.commit()?;
         Ok(n)
     }
 
@@ -208,11 +223,67 @@ impl Db {
         Ok(service)
     }
 
+    /// サービスの全履歴を削除（タグも削除する）
     pub fn delete_service(&self, service: &str) -> Result<usize> {
-        let n = self.conn.execute(
+        let tx = self.conn.unchecked_transaction()?;
+        let n = tx.execute(
             "DELETE FROM password_history WHERE service = ?1",
             params![service],
         )?;
+        tx.execute("DELETE FROM service_tags WHERE service = ?1", params![service])?;
+        tx.commit()?;
         Ok(n)
+    }
+
+    /// サービスにタグを付ける（付いていなかったタグの数を返す）
+    pub fn add_tags(&self, service: &str, tags: &[String]) -> Result<usize> {
+        let tx = self.conn.unchecked_transaction()?;
+        let mut n = 0;
+        for tag in tags {
+            n += tx.execute(
+                "INSERT OR IGNORE INTO service_tags (service, tag) VALUES (?1, ?2)",
+                params![service, tag],
+            )?;
+        }
+        tx.commit()?;
+        Ok(n)
+    }
+
+    /// サービスからタグを外す（外したタグの数を返す）
+    pub fn remove_tags(&self, service: &str, tags: &[String]) -> Result<usize> {
+        let tx = self.conn.unchecked_transaction()?;
+        let mut n = 0;
+        for tag in tags {
+            n += tx.execute(
+                "DELETE FROM service_tags WHERE service = ?1 AND tag = ?2",
+                params![service, tag],
+            )?;
+        }
+        tx.commit()?;
+        Ok(n)
+    }
+
+    /// サービスに付いているタグ（タグ名順）
+    pub fn tags_of(&self, service: &str) -> Result<Vec<String>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT tag FROM service_tags WHERE service = ?1 ORDER BY tag")?;
+        let tags = stmt
+            .query_map(params![service], |row| row.get(0))?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(tags)
+    }
+
+    /// 履歴のあるサービスに付いている (サービス名, タグ) の一覧（サービス名・タグ名順）
+    pub fn all_service_tags(&self) -> Result<Vec<(String, String)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT service, tag FROM service_tags
+             WHERE service IN (SELECT DISTINCT service FROM password_history)
+             ORDER BY service, tag",
+        )?;
+        let rows = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(rows)
     }
 }

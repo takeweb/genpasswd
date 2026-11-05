@@ -166,10 +166,10 @@ Saved to history for service "github" (user: octocat).
 ### サービスの履歴を確認する
 
 ```
-genpasswd_ex history [--service <SERVICE>]
+genpasswd_ex history [--service <SERVICE> | --tag <TAG>[,<TAG>...]...]
 ```
 
-`--service`（`-s`）を省略すると、全サービスの履歴をサービスごとに表示します。この場合パスワードは `********` とマスク表示されます（平文で確認するには `-s` でサービスを指定してください）。
+`--service`（`-s`）を省略すると、全サービスの履歴をサービスごとに表示します。`--tag`（`-t`）でタグの付いたサービスに絞り込めます（[タグ](#サービスにタグを付ける) を参照）。この場合パスワードは `********` とマスク表示されます（平文で確認するには `-s` でサービスを指定してください）。
 
 ```
 $ genpasswd_ex history
@@ -194,7 +194,7 @@ $ genpasswd_ex history -s github
    1  -                     (*>asM70MQrmdd1mM5bT  2026-07-07T08:01:39.249806+09:00
 ```
 
-サービスの見出しは `=` の罫線で表示されます（端末への出力時は太字・色付き。環境変数 `NO_COLOR` を設定すると色なし）。新しいパスワードが先頭に表示されます。ユーザ名未設定の場合は `-` と表示されます。
+サービスの見出しは `=` の罫線で表示されます（端末への出力時は太字・色付き。環境変数 `NO_COLOR` を設定すると色なし）。タグが付いている場合は見出しに `#nx #stg` のように表示されます。新しいパスワードが先頭に表示されます。ユーザ名未設定の場合は `-` と表示されます。
 
 ---
 
@@ -221,11 +221,58 @@ genpasswd_ex list
 
 ```
 $ genpasswd_ex list
-Service  Count
----------------
-aws          2
+Service  Count  Tags
+--------------------------
+aws          2  #private
 github       4
 ```
+
+タグが付いているサービスは `Tags` 列に表示されます。
+
+---
+
+### サービスにタグを付ける
+
+サービスにタグを付けておくと、`history -t` で表示を絞り込めます。顧客・環境（共通 / STG / 本番）などでグルーピングする用途を想定しています。タグはサービス単位で付くため、同じサービスのユーザ・履歴をすべて含みます。
+
+```
+genpasswd_ex tag   --service <SERVICE> <TAG>...   # タグを付ける
+genpasswd_ex untag --service <SERVICE> <TAG>...   # タグを外す
+genpasswd_ex tags                                 # タグごとのサービス一覧
+```
+
+```
+$ genpasswd_ex tag -s 'BIG-IP Edge Client' nx common
+Added 2 tag(s) to service "BIG-IP Edge Client": #common #nx
+$ genpasswd_ex tag -s 'バッチサーバ(ステージング用)' nx stg
+Added 2 tag(s) to service "バッチサーバ(ステージング用)": #nx #stg
+$ genpasswd_ex tag -s 'バッチサーバ(本番用)' nx prod
+Added 2 tag(s) to service "バッチサーバ(本番用)": #nx #prod
+```
+
+`history -t` の指定方法:
+
+| 指定 | 意味 |
+|---|---|
+| `-t stg` | `stg` タグの付いたサービス |
+| `-t common -t stg` | `common` **または** `stg`（`-t` を複数指定すると OR） |
+| `-t nx,stg` | `nx` **かつ** `stg`（カンマ区切りは AND） |
+| `-t nx,common -t nx,stg` | (`nx` かつ `common`) または (`nx` かつ `stg`) |
+
+```
+# 共通 + STG の設定だけを表示
+$ genpasswd_ex history -t common -t stg
+=== BIG-IP Edge Client (1 record(s)) #common #nx ===============================
+...
+=== バッチサーバ(ステージング用) (2 record(s)) #nx #stg ========================
+...
+```
+
+- `-t` は `-s` と同時には指定できません。`-s` を省略したときと同じく、パスワードはマスク表示されます
+- タグは `#nx #stg` の形式で表示されます。指定するときは `#` なしで書きます（`#` はシェルでコメント扱いになるため。`'#stg'` のようにクォートすれば `#` 付きでも可）
+- タグ名にカンマ・空白は使えません。大文字・小文字は区別されます
+- タグを付けられるのは履歴のあるサービスだけです（サービス名の打ち間違い防止）
+- `rename` するとタグも新しいサービス名に引き継がれます（`--merge` の場合は両方のタグを合わせたものになります）。`delete` でサービスの履歴を削除するとタグも削除されます
 
 ---
 
