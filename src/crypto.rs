@@ -7,12 +7,45 @@ use base64::engine::general_purpose::STANDARD as B64;
 const PREFIX: &str = "enc:v1:";
 const NONCE_LEN: usize = 12;
 
-/// キーチェーンに鍵を保存するときのサービス名
-const KEYCHAIN_SERVICE: &str = "genpasswd_ex";
+/// 鍵ストアに鍵を保存するときのサービス名
+const KEYCHAIN_SERVICE: &str = "genpasswd";
+/// 旧ツール名（genpasswd_ex）時代のサービス名。新しい名前で鍵が見つからないときに引き継ぎ元として使う
+const LEGACY_KEYCHAIN_SERVICE: &str = "genpasswd_ex";
 
 /// キーチェーンのアカウント名（debug ビルドは本番の鍵と分ける）
 fn keychain_account() -> &'static str {
     if cfg!(debug_assertions) { "db-key-dev" } else { "db-key" }
+}
+
+/// 環境変数で指定された鍵（`GENPASSWD_KEY`、旧名 `GENPASSWD_EX_KEY` も可）
+fn key_from_env() -> Option<(String, &'static str)> {
+    ["GENPASSWD_KEY", "GENPASSWD_EX_KEY"]
+        .into_iter()
+        .find_map(|name| std::env::var(name).ok().map(|v| (v, name)))
+}
+
+/// 鍵ストアから鍵を取得する。なければ旧名の鍵を新しい名前に複写して使い、それもなければ生成して登録する
+fn load_or_create_key() -> Result<Vec<u8>, String> {
+    let account = keychain_account();
+    if let Some(key) = keychain::load(KEYCHAIN_SERVICE, account)? {
+        return Ok(key);
+    }
+    // 旧名の鍵は削除せずに残す（旧バージョンのバイナリでも引き続き使えるように）
+    if let Some(key) = keychain::load(LEGACY_KEYCHAIN_SERVICE, account)? {
+        keychain::store(KEYCHAIN_SERVICE, account, &key)?;
+        eprintln!(
+            "Copied encryption key from {} to {} in {} (account {}).",
+            LEGACY_KEYCHAIN_SERVICE,
+            KEYCHAIN_SERVICE,
+            keychain::STORE_NAME,
+            account
+        );
+        return Ok(key);
+    }
+    let key = Key::<Aes256Gcm>::generate().to_vec();
+    keychain::store(KEYCHAIN_SERVICE, account, &key)?;
+    eprintln!("Created encryption key in {} ({} / {}).", keychain::STORE_NAME, KEYCHAIN_SERVICE, account);
+    Ok(key)
 }
 
 pub struct Cipher {
@@ -20,17 +53,15 @@ pub struct Cipher {
 }
 
 impl Cipher {
-    /// 鍵を読み込む。環境変数 `GENPASSWD_EX_KEY`（base64）があれば優先し、
+    /// 鍵を読み込む。環境変数 `GENPASSWD_KEY`（base64）があれば優先し、
     /// なければ OS の鍵ストア（macOS: キーチェーン / Windows: 資格情報マネージャー）から取得する
-    /// （未登録なら生成して登録する）
+    /// （未登録なら旧名の鍵を引き継ぐか、生成して登録する）
     pub fn load() -> Result<Self, String> {
-        let key = match std::env::var("GENPASSWD_EX_KEY") {
-            Ok(b64) => B64
+        let key = match key_from_env() {
+            Some((b64, name)) => B64
                 .decode(b64.trim())
-                .map_err(|e| format!("invalid GENPASSWD_EX_KEY: {}", e))?,
-            Err(_) => keychain::load_or_create(KEYCHAIN_SERVICE, keychain_account(), || {
-                Key::<Aes256Gcm>::generate().to_vec()
-            })?,
+                .map_err(|e| format!("invalid {}: {}", name, e))?,
+            None => load_or_create_key()?,
         };
         let key = Key::<Aes256Gcm>::try_from(key.as_slice())
             .map_err(|_| format!("invalid key length: {} bytes (expected 32)", key.len()))?;
@@ -71,28 +102,25 @@ pub fn is_encrypted(stored: &str) -> bool {
     stored.starts_with(PREFIX)
 }
 
+/// macOS のキーチェーン（汎用パスワード、サービス名 / アカウント名）に鍵を保存する
 #[cfg(target_os = "macos")]
 mod keychain {
     use security_framework::passwords::{get_generic_password, set_generic_password};
     use security_framework_sys::base::errSecItemNotFound;
 
-    pub fn load_or_create(
-        service: &str,
-        account: &str,
-        generate: impl FnOnce() -> Vec<u8>,
-    ) -> Result<Vec<u8>, String> {
+    pub const STORE_NAME: &str = "keychain";
+
+    /// 鍵を読み込む（未登録は None。拒否などのエラーは Err にして、既存の鍵を上書きしないようにする）
+    pub fn load(service: &str, account: &str) -> Result<Option<Vec<u8>>, String> {
         match get_generic_password(service, account) {
-            Ok(key) => Ok(key),
-            // 未登録の場合のみ新規作成する（拒否などのエラーで既存の鍵を上書きしないため）
-            Err(e) if e.code() == errSecItemNotFound => {
-                let key = generate();
-                set_generic_password(service, account, &key)
-                    .map_err(|e| format!("failed to save key to keychain: {}", e))?;
-                eprintln!("Created encryption key in keychain ({} / {}).", service, account);
-                Ok(key)
-            }
+            Ok(key) => Ok(Some(key)),
+            Err(e) if e.code() == errSecItemNotFound => Ok(None),
             Err(e) => Err(format!("failed to read key from keychain: {}", e)),
         }
+    }
+
+    pub fn store(service: &str, account: &str, key: &[u8]) -> Result<(), String> {
+        set_generic_password(service, account, key).map_err(|e| format!("failed to save key to keychain: {}", e))
     }
 }
 
@@ -105,19 +133,15 @@ mod keychain {
         CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC, CREDENTIALW, CredFree, CredReadW, CredWriteW,
     };
 
+    pub const STORE_NAME: &str = "Windows Credential Manager";
+
     fn wide(s: &str) -> Vec<u16> {
         s.encode_utf16().chain(std::iter::once(0)).collect()
     }
 
-    pub fn load_or_create(
-        service: &str,
-        account: &str,
-        generate: impl FnOnce() -> Vec<u8>,
-    ) -> Result<Vec<u8>, String> {
-        let target = format!("{}:{}", service, account);
-        let mut target_w = wide(&target);
-        let mut user_w = wide(account);
-
+    /// 鍵を読み込む（未登録は None。その他のエラーは Err にして、既存の鍵を上書きしないようにする）
+    pub fn load(service: &str, account: &str) -> Result<Option<Vec<u8>>, String> {
+        let target_w = wide(&format!("{}:{}", service, account));
         let mut cred: *mut CREDENTIALW = ptr::null_mut();
         // SAFETY: target_w は NUL 終端の UTF-16。成功時の cred は CredFree で解放する
         let ok = unsafe { CredReadW(target_w.as_ptr(), CRED_TYPE_GENERIC, 0, &mut cred) };
@@ -128,47 +152,54 @@ mod keychain {
                 CredFree(cred as *const _);
                 blob
             };
-            return Ok(key);
+            return Ok(Some(key));
         }
-
         let err = unsafe { GetLastError() };
-        // 未登録の場合のみ新規作成する（その他のエラーで既存の鍵を上書きしないため）
-        if err != ERROR_NOT_FOUND {
-            return Err(format!("failed to read key from credential manager (error {})", err));
+        if err == ERROR_NOT_FOUND {
+            Ok(None)
+        } else {
+            Err(format!("failed to read key from credential manager (error {})", err))
         }
+    }
 
-        let mut key = generate();
-        let new_cred = CREDENTIALW {
+    pub fn store(service: &str, account: &str, key: &[u8]) -> Result<(), String> {
+        let mut target_w = wide(&format!("{}:{}", service, account));
+        let mut user_w = wide(account);
+        let mut blob = key.to_vec();
+        let cred = CREDENTIALW {
             Flags: 0,
             Type: CRED_TYPE_GENERIC,
             TargetName: target_w.as_mut_ptr(),
             Comment: ptr::null_mut(),
             LastWritten: unsafe { std::mem::zeroed() },
-            CredentialBlobSize: key.len() as u32,
-            CredentialBlob: key.as_mut_ptr(),
+            CredentialBlobSize: blob.len() as u32,
+            CredentialBlob: blob.as_mut_ptr(),
             Persist: CRED_PERSIST_LOCAL_MACHINE,
             AttributeCount: 0,
             Attributes: ptr::null_mut(),
             TargetAlias: ptr::null_mut(),
             UserName: user_w.as_mut_ptr(),
         };
-        // SAFETY: new_cred が参照するバッファはこの呼び出しの間生きている
-        if unsafe { CredWriteW(&new_cred, 0) } == 0 {
+        // SAFETY: cred が参照するバッファはこの呼び出しの間生きている
+        if unsafe { CredWriteW(&cred, 0) } == 0 {
             let err = unsafe { GetLastError() };
             return Err(format!("failed to save key to credential manager (error {})", err));
         }
-        eprintln!("Created encryption key in Windows Credential Manager ({}).", target);
-        Ok(key)
+        Ok(())
     }
 }
 
 #[cfg(not(any(target_os = "macos", windows)))]
 mod keychain {
-    pub fn load_or_create(
-        _service: &str,
-        _account: &str,
-        _generate: impl FnOnce() -> Vec<u8>,
-    ) -> Result<Vec<u8>, String> {
-        Err("keychain is only supported on macOS and Windows; set GENPASSWD_EX_KEY instead".to_string())
+    pub const STORE_NAME: &str = "key store";
+
+    const UNSUPPORTED: &str = "keychain is only supported on macOS and Windows; set GENPASSWD_KEY instead";
+
+    pub fn load(_service: &str, _account: &str) -> Result<Option<Vec<u8>>, String> {
+        Err(UNSUPPORTED.to_string())
+    }
+
+    pub fn store(_service: &str, _account: &str, _key: &[u8]) -> Result<(), String> {
+        Err(UNSUPPORTED.to_string())
     }
 }

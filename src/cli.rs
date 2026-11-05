@@ -8,22 +8,22 @@ use clap::{ArgGroup, Parser, Subcommand};
     version,
     about = "Secure Password Generator with History",
     after_help = "Examples:
-  genpasswd_ex save -s <SERVICE> -u <USERNAME> [-l <LENGTH>] [-k] [-n]
-  genpasswd_ex add -s <SERVICE> '<PASSWORD>' -u <USERNAME>
-  genpasswd_ex history [-s <SERVICE> | -t <TAG>[,<TAG>...]...]
-  genpasswd_ex copy <ID>
-  genpasswd_ex rename -s <SERVICE> <NEW_SERVICE>
-  genpasswd_ex remove <ID>
-  genpasswd_ex delete -s <SERVICE>
-  genpasswd_ex update <ID> [-u <USERNAME>] [-p '<PASSWORD>']
-  genpasswd_ex tag -s <SERVICE> <TAG>...
-  genpasswd_ex untag -s <SERVICE> <TAG>...
-  genpasswd_ex tags
+  genpasswd save -s <SERVICE> -u <USERNAME> [-l <LENGTH>] [-k] [-n]
+  genpasswd add -s <SERVICE> '<PASSWORD>' -u <USERNAME>
+  genpasswd history [-s <SERVICE> | -t <TAG>[,<TAG>...]...]
+  genpasswd copy <ID>
+  genpasswd rename -s <SERVICE> <NEW_SERVICE>
+  genpasswd remove <ID>
+  genpasswd delete -s <SERVICE>
+  genpasswd update <ID> [-u <USERNAME>] [-p '<PASSWORD>']
+  genpasswd tag -s <SERVICE> <TAG>...
+  genpasswd untag -s <SERVICE> <TAG>...
+  genpasswd tags
 
 Passwords are encrypted with a key stored in the OS key store
-(macOS: Keychain / Windows: Credential Manager; otherwise set GENPASSWD_EX_KEY).
+(macOS: Keychain / Windows: Credential Manager; otherwise set GENPASSWD_KEY).
 
-Run 'genpasswd_ex <COMMAND> -h' for command-specific options."
+Run 'genpasswd <COMMAND> -h' for command-specific options."
 )]
 pub struct Args {
     /// Password length
