@@ -1,4 +1,4 @@
-# genpasswd_ex
+# genpasswd
 
 パスワード生成 + サービスごとの履歴管理ツール。
 
@@ -14,13 +14,13 @@
 cargo install --path . --root ~/
 ```
 
-`~/bin` が `$PATH` に含まれていれば、どこからでも `genpasswd_ex` で実行できます。
+`~/bin` が `$PATH` に含まれていれば、どこからでも `genpasswd` で実行できます。
 
 インストールせずにビルドだけする場合:
 
 ```
-cargo build --release   # → target/release/genpasswd_ex
-cargo build-mac         # → target/aarch64-apple-darwin/release/genpasswd_ex（ターゲット明示）
+cargo build --release   # → target/release/genpasswd
+cargo build-mac         # → target/aarch64-apple-darwin/release/genpasswd（ターゲット明示）
 ```
 
 ### Windows
@@ -35,11 +35,11 @@ PowerShell で:
 # %USERPROFILE%\bin にインストール
 cargo install --path . --root $HOME
 
-# ビルドだけする場合 → target\release\genpasswd_ex.exe
+# ビルドだけする場合 → target\release\genpasswd.exe
 cargo build --release
 ```
 
-`%USERPROFILE%\bin` をユーザー環境変数 `Path` に追加すると、どこからでも `genpasswd_ex` で実行できます。
+`%USERPROFILE%\bin` をユーザー環境変数 `Path` に追加すると、どこからでも `genpasswd` で実行できます。
 
 #### macOS からクロスコンパイルする
 
@@ -53,10 +53,10 @@ rustup target add x86_64-pc-windows-gnu
 ビルド:
 
 ```
-cargo build-win   # → target/x86_64-pc-windows-gnu/release/genpasswd_ex.exe
+cargo build-win   # → target/x86_64-pc-windows-gnu/release/genpasswd.exe
 ```
 
-生成された `genpasswd_ex.exe` を Windows にコピーし、`Path` の通ったフォルダに置いて使います（単体で動作し、追加の DLL は不要です）。
+生成された `genpasswd.exe` を Windows にコピーし、`Path` の通ったフォルダに置いて使います（単体で動作し、追加の DLL は不要です）。
 
 ### ビルド用エイリアス
 
@@ -66,19 +66,43 @@ cargo build-win   # → target/x86_64-pc-windows-gnu/release/genpasswd_ex.exe
 
 | コマンド | ターゲット | 出力先 |
 |---|---|---|
-| `cargo build-mac` | macOS (Apple Silicon) | `target/aarch64-apple-darwin/release/genpasswd_ex` |
-| `cargo build-win` | Windows (x86_64) | `target/x86_64-pc-windows-gnu/release/genpasswd_ex.exe` |
+| `cargo build-mac` | macOS (Apple Silicon) | `target/aarch64-apple-darwin/release/genpasswd` |
+| `cargo build-win` | Windows (x86_64) | `target/x86_64-pc-windows-gnu/release/genpasswd.exe` |
 
 ## データ保存先
 
 | OS | パス |
 |---|---|
-| macOS / Linux | `~/.local/share/genpasswd_ex/history.db` |
-| Windows | `%APPDATA%\genpasswd_ex\history.db` |
+| macOS / Linux | `~/.local/share/genpasswd/history.db` |
+| Windows | `%APPDATA%\genpasswd\history.db` |
 
 macOS / Linux では、ディレクトリは `700`、DBファイルは `600`（所有者のみ読み書き可）に設定されます。既存のファイルも実行時に同じ権限へ変更されます。
 
 DB と暗号化鍵は端末ごとに別管理です（macOS と Windows で DB を共有する想定はしていません）。
+
+## 旧名 genpasswd_ex からの移行
+
+このツールは以前 `genpasswd_ex` という名前でした（以前の `genpasswd` は [genpasswd_simple](https://github.com/takeweb/genpasswd_simple) に改名）。新しいバージョンは、初回実行時に旧名のデータを自動で引き継ぎます。
+
+| 対象 | 旧 | 新 | 引き継ぎ方 |
+|---|---|---|---|
+| DB（macOS） | `~/.local/share/genpasswd_ex/history.db` | `~/.local/share/genpasswd/history.db` | 新しい DB がなければコピー |
+| DB（Windows） | `%APPDATA%\genpasswd_ex\history.db` | `%APPDATA%\genpasswd\history.db` | 同上 |
+| 鍵（macOS） | キーチェーン `genpasswd_ex` / `db-key` | `genpasswd` / `db-key` | 新しい鍵がなければコピー |
+| 鍵（Windows） | 資格情報 `genpasswd_ex:db-key` | `genpasswd:db-key` | 同上 |
+| 環境変数 | `GENPASSWD_EX_DB` / `GENPASSWD_EX_KEY` | `GENPASSWD_DB` / `GENPASSWD_KEY` | 旧名も引き続き使える（新名を優先） |
+
+- 旧 DB・旧鍵は削除しません。新しいバージョンで問題なく使えることを確認したら、手動で削除してください
+- 引き継ぎ後に旧バージョンで追加・変更した内容は、新しい DB には反映されません
+
+旧バージョンのコマンドの削除:
+
+```
+# macOS
+cargo uninstall genpasswd_ex --root ~/
+```
+
+Windows では `genpasswd_ex.exe` を削除し、新しい `genpasswd.exe` を同じフォルダに置いてください。
 
 ## 暗号化
 
@@ -86,18 +110,18 @@ DB と暗号化鍵は端末ごとに別管理です（macOS と Windows で DB �
 
 | OS | 保存先 |
 |---|---|
-| macOS | キーチェーン（サービス `genpasswd_ex` / アカウント `db-key`） |
-| Windows | 資格情報マネージャーの汎用資格情報（ターゲット名 `genpasswd_ex:db-key`） |
+| macOS | キーチェーン（サービス `genpasswd` / アカウント `db-key`） |
+| Windows | 資格情報マネージャーの汎用資格情報（ターゲット名 `genpasswd:db-key`） |
 
 - `history` では復号して表示するため、使い方は変わりません
 - macOS では、再インストール後などは初回アクセス時にキーチェーンへのアクセス許可ダイアログが表示されます（「常に許可」を選ぶと以後は表示されません）
 - **鍵ストアの鍵を削除すると、保存済みのパスワードは復号できなくなります**
-- macOS / Windows 以外では、環境変数 `GENPASSWD_EX_KEY` に base64 の 32 バイト鍵を指定してください（`openssl rand -base64 32` で生成可）
+- macOS / Windows 以外では、環境変数 `GENPASSWD_KEY` に base64 の 32 バイト鍵を指定してください（`openssl rand -base64 32` で生成可）
 
 旧バージョンで保存した平文のパスワードもそのまま表示できます。暗号化するには次を実行してください（念のため事前に DB をバックアップしてください）。
 
 ```
-$ genpasswd_ex encrypt
+$ genpasswd encrypt
 Encrypted 12 password(s).
 ```
 
@@ -106,7 +130,7 @@ Encrypted 12 password(s).
 ### パスワードを生成する（保存しない）
 
 ```
-genpasswd_ex [--length <長さ>] [--symbols] [--no-copy]
+genpasswd [--length <長さ>] [--symbols] [--no-copy]
 ```
 
 | オプション | 短縮 | デフォルト | 説明 |
@@ -117,12 +141,12 @@ genpasswd_ex [--length <長さ>] [--symbols] [--no-copy]
 
 ```
 # 16文字（デフォルト）
-$ genpasswd_ex
+$ genpasswd
 Generated password: TDeXIVCda7bEWQts
 Copied to clipboard.
 
 # 24文字・記号あり
-$ genpasswd_ex --length 24 --symbols
+$ genpasswd --length 24 --symbols
 Generated password: ]]:dwmstZjQ9scuU1qLRLgLQ
 Copied to clipboard.
 ```
@@ -134,7 +158,7 @@ Copied to clipboard.
 ### パスワードを生成して履歴に保存する
 
 ```
-genpasswd_ex save --service <SERVICE> [--username <ユーザ名>] [--length <長さ>] [--symbols] [--no-copy]
+genpasswd save --service <SERVICE> [--username <ユーザ名>] [--length <長さ>] [--symbols] [--no-copy]
 ```
 
 | 引数/オプション | 短縮 | デフォルト | 説明 |
@@ -147,13 +171,13 @@ genpasswd_ex save --service <SERVICE> [--username <ユーザ名>] [--length <長
 
 ```
 # ユーザ名なし
-$ genpasswd_ex save -s github
+$ genpasswd save -s github
 Generated password: CW5HsZlYxIib2Ut4
 Copied to clipboard.
 Saved to history for service "github".
 
 # ユーザ名あり・20文字・記号あり
-$ genpasswd_ex save -s github --username octocat --length 20 --symbols
+$ genpasswd save -s github --username octocat --length 20 --symbols
 Generated password: (*>asM70MQrmdd1mM5bT
 Copied to clipboard.
 Saved to history for service "github" (user: octocat).
@@ -166,13 +190,13 @@ Saved to history for service "github" (user: octocat).
 ### サービスの履歴を確認する
 
 ```
-genpasswd_ex history [--service <SERVICE> | --tag <TAG>[,<TAG>...]...]
+genpasswd history [--service <SERVICE> | --tag <TAG>[,<TAG>...]...]
 ```
 
 `--service`（`-s`）を省略すると、全サービスの履歴をサービスごとに表示します。`--tag`（`-t`）でタグの付いたサービスに絞り込めます（[タグ](#サービスにタグを付ける) を参照）。この場合パスワードは `********` とマスク表示されます（平文で確認するには `-s` でサービスを指定してください）。
 
 ```
-$ genpasswd_ex history
+$ genpasswd history
 === aws (1 record(s)) ==========================================================
   ID  Username              Password              Created At
 --------------------------------------------------------------------------------
@@ -185,7 +209,7 @@ $ genpasswd_ex history
 ```
 
 ```
-$ genpasswd_ex history -s github
+$ genpasswd history -s github
 === github (3 record(s)) =======================================================
   ID  Username              Password              Created At
 --------------------------------------------------------------------------------
@@ -201,11 +225,11 @@ $ genpasswd_ex history -s github
 ### 履歴のパスワードをクリップボードにコピーする
 
 ```
-genpasswd_ex copy <ID>
+genpasswd copy <ID>
 ```
 
 ```
-$ genpasswd_ex copy 7
+$ genpasswd copy 7
 Copied password of ID 7 (service "github", user: octocat) to clipboard.
 ```
 
@@ -216,11 +240,11 @@ ID は `history` で確認してください（`-s` を省略したマスク表�
 ### 登録済みサービス一覧を表示する
 
 ```
-genpasswd_ex list
+genpasswd list
 ```
 
 ```
-$ genpasswd_ex list
+$ genpasswd list
 Service  Count  Tags
 --------------------------
 aws          2  #private
@@ -236,17 +260,17 @@ github       4
 サービスにタグを付けておくと、`history -t` で表示を絞り込めます。顧客・環境（共通 / STG / 本番）などでグルーピングする用途を想定しています。タグはサービス単位で付くため、同じサービスのユーザ・履歴をすべて含みます。
 
 ```
-genpasswd_ex tag   --service <SERVICE> <TAG>...   # タグを付ける
-genpasswd_ex untag --service <SERVICE> <TAG>...   # タグを外す
-genpasswd_ex tags                                 # タグごとのサービス一覧
+genpasswd tag   --service <SERVICE> <TAG>...   # タグを付ける
+genpasswd untag --service <SERVICE> <TAG>...   # タグを外す
+genpasswd tags                                 # タグごとのサービス一覧
 ```
 
 ```
-$ genpasswd_ex tag -s 'BIG-IP Edge Client' nx common
+$ genpasswd tag -s 'BIG-IP Edge Client' nx common
 Added 2 tag(s) to service "BIG-IP Edge Client": #common #nx
-$ genpasswd_ex tag -s 'バッチサーバ(ステージング用)' nx stg
+$ genpasswd tag -s 'バッチサーバ(ステージング用)' nx stg
 Added 2 tag(s) to service "バッチサーバ(ステージング用)": #nx #stg
-$ genpasswd_ex tag -s 'バッチサーバ(本番用)' nx prod
+$ genpasswd tag -s 'バッチサーバ(本番用)' nx prod
 Added 2 tag(s) to service "バッチサーバ(本番用)": #nx #prod
 ```
 
@@ -261,7 +285,7 @@ Added 2 tag(s) to service "バッチサーバ(本番用)": #nx #prod
 
 ```
 # 共通 + STG の設定だけを表示
-$ genpasswd_ex history -t common -t stg
+$ genpasswd history -t common -t stg
 === BIG-IP Edge Client (1 record(s)) #common #nx ===============================
 ...
 === バッチサーバ(ステージング用) (2 record(s)) #nx #stg ========================
@@ -279,7 +303,7 @@ $ genpasswd_ex history -t common -t stg
 ### 既存のパスワードを履歴に追加する
 
 ```
-genpasswd_ex add --service <SERVICE> <PASSWORD> [--username <ユーザ名>]
+genpasswd add --service <SERVICE> <PASSWORD> [--username <ユーザ名>]
 ```
 
 | 引数/オプション | 短縮 | デフォルト | 説明 |
@@ -289,7 +313,7 @@ genpasswd_ex add --service <SERVICE> <PASSWORD> [--username <ユーザ名>]
 | `--username` | `-u` | 履歴の最新ユーザ名 | サービスのユーザ名（省略時は同サービスの履歴にある最新のユーザ名。履歴になければ空） |
 
 ```
-$ genpasswd_ex add -s github myP@ssw0rd --username octocat
+$ genpasswd add -s github myP@ssw0rd --username octocat
 Added to history for service "github" (user: octocat).
 ```
 
@@ -300,7 +324,7 @@ Added to history for service "github" (user: octocat).
 ### 履歴のユーザ名・パスワードを更新する
 
 ```
-genpasswd_ex update <ID> [--username <ユーザ名>] [--password <パスワード>]
+genpasswd update <ID> [--username <ユーザ名>] [--password <パスワード>]
 ```
 
 | 引数/オプション | 短縮 | 説明 |
@@ -312,10 +336,10 @@ genpasswd_ex update <ID> [--username <ユーザ名>] [--password <パスワー�
 `-u` と `-p` の少なくとも一方が必要です。指定しなかった項目は変更されません。
 
 ```
-$ genpasswd_ex update 16 -u octocat
+$ genpasswd update 16 -u octocat
 Updated history entry ID 16.
 
-$ genpasswd_ex update 15 -p 'C$Y3xvqiRsHF2H.'
+$ genpasswd update 15 -p 'C$Y3xvqiRsHF2H.'
 Updated history entry ID 15.
 ```
 
@@ -326,7 +350,7 @@ Updated history entry ID 15.
 ### サービス名を変更する
 
 ```
-genpasswd_ex rename --service <SERVICE> <NEW_SERVICE> [--merge]
+genpasswd rename --service <SERVICE> <NEW_SERVICE> [--merge]
 ```
 
 | 引数/オプション | 短縮 | 説明 |
@@ -336,7 +360,7 @@ genpasswd_ex rename --service <SERVICE> <NEW_SERVICE> [--merge]
 | `--merge` | なし | 変更先のサービスが既にある場合に履歴を統合する |
 
 ```
-$ genpasswd_ex rename -s google Google
+$ genpasswd rename -s google Google
 Renamed service "google" to "Google" (1 record(s)).
 ```
 
@@ -347,11 +371,11 @@ Renamed service "google" to "Google" (1 record(s)).
 ### 履歴を1件削除する
 
 ```
-genpasswd_ex remove <ID>
+genpasswd remove <ID>
 ```
 
 ```
-$ genpasswd_ex remove 5
+$ genpasswd remove 5
 Removed history entry ID 5 (service "github").
 ```
 
@@ -362,11 +386,11 @@ ID は `history` で確認してください。
 ### サービスの履歴を削除する
 
 ```
-genpasswd_ex delete --service <SERVICE>
+genpasswd delete --service <SERVICE>
 ```
 
 ```
-$ genpasswd_ex delete -s aws
+$ genpasswd delete -s aws
 Deleted 2 record(s) for service "aws".
 ```
 

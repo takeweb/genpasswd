@@ -98,24 +98,30 @@ fn open_db() -> db::Db {
     db::Db::open(&db_path()).expect("Failed to open database")
 }
 
-/// データディレクトリ（Windows: `%APPDATA%\genpasswd_ex` / それ以外: `~/.local/share/genpasswd_ex`）
+/// データディレクトリ名
+const APP_DIR: &str = "genpasswd";
+/// 旧ツール名（genpasswd_ex）時代のデータディレクトリ名。新しい DB がなければここから引き継ぐ
+const LEGACY_APP_DIR: &str = "genpasswd_ex";
+
+/// データディレクトリ（Windows: `%APPDATA%\<name>` / それ以外: `~/.local/share/<name>`）
 #[cfg(windows)]
-fn data_dir() -> PathBuf {
-    dirs::data_dir().expect("Cannot determine data directory").join("genpasswd_ex")
+fn data_dir(name: &str) -> PathBuf {
+    dirs::data_dir().expect("Cannot determine data directory").join(name)
 }
 
 #[cfg(not(windows))]
-fn data_dir() -> PathBuf {
+fn data_dir(name: &str) -> PathBuf {
     let home = dirs::home_dir().expect("Cannot determine home directory");
-    home.join(".local/share/genpasswd_ex")
+    home.join(".local/share").join(name)
 }
 
+/// DB のパス（環境変数 `GENPASSWD_DB`、旧名 `GENPASSWD_EX_DB` があれば優先）
 fn db_path() -> PathBuf {
-    if let Ok(path) = std::env::var("GENPASSWD_EX_DB") {
+    if let Some(path) = ["GENPASSWD_DB", "GENPASSWD_EX_DB"].into_iter().find_map(|name| std::env::var(name).ok()) {
         return PathBuf::from(path);
     }
 
-    let dir = data_dir();
+    let dir = data_dir(APP_DIR);
     std::fs::create_dir_all(&dir).expect("Failed to create data directory");
     #[cfg(unix)]
     {
@@ -124,8 +130,23 @@ fn db_path() -> PathBuf {
             .expect("Failed to set permissions of data directory");
     }
     if cfg!(debug_assertions) {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("history_dev.db")
-    } else {
-        dir.join("history.db")
+        return PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("history_dev.db");
     }
+
+    let path = dir.join("history.db");
+    migrate_legacy_db(&path);
+    path
+}
+
+/// 新しい DB がまだなく、旧ディレクトリに DB があればコピーして引き継ぐ（旧 DB は削除しない）
+fn migrate_legacy_db(path: &std::path::Path) {
+    if path.exists() {
+        return;
+    }
+    let legacy = data_dir(LEGACY_APP_DIR).join("history.db");
+    if !legacy.exists() {
+        return;
+    }
+    std::fs::copy(&legacy, path).expect("Failed to copy database from the legacy data directory");
+    eprintln!("Copied database from {} to {}.", legacy.display(), path.display());
 }

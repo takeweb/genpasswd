@@ -1,4 +1,4 @@
-//! genpasswd_ex — パスワード生成 + サービスごとの履歴管理 CLI
+//! genpasswd — パスワード生成 + サービスごとの履歴管理 CLI
 //!
 //! main.rs はエントリーポイントで、引数を解析して各サブコマンドの処理
 //! （`commands/<名前>.rs` の `run()`）に振り分けるだけにしている。
@@ -20,7 +20,7 @@ use clap::Parser;
 use cli::{Args, Command};
 
 fn main() {
-    // .env があれば読み込む（GENPASSWD_EX_DB / GENPASSWD_EX_KEY を設定できる）
+    // .env があれば読み込む（GENPASSWD_DB / GENPASSWD_KEY を設定できる）
     dotenvy::dotenv().ok();
     let args = Args::parse();
 

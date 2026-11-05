@@ -378,7 +378,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "genpasswd_ex"
+name = "genpasswd"
 version = "0.1.0"
 dependencies = [
  "aes-gcm",
