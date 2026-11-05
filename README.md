@@ -4,7 +4,9 @@
 
 パスワードはランダムに生成され、サービス名・ユーザ名と紐づけて SQLite に保存できます。
 
-## インストール
+## ビルド・インストール
+
+### macOS
 
 `~/bin` にインストールする場合:
 
@@ -14,31 +16,58 @@ cargo install --path . --root ~/
 
 `~/bin` が `$PATH` に含まれていれば、どこからでも `genpasswd_ex` で実行できます。
 
-## ビルド（インストールせずに試す場合）
+インストールせずにビルドだけする場合:
 
 ```
+cargo build --release   # → target/release/genpasswd_ex
+cargo build-mac         # → target/aarch64-apple-darwin/release/genpasswd_ex（ターゲット明示）
+```
+
+### Windows
+
+#### Windows 上でビルドする
+
+事前に [Rust（rustup）](https://rustup.rs/) と Visual Studio Build Tools（「C++ によるデスクトップ開発」）をインストールしてください（SQLite を C からビルドするため C コンパイラが必要です）。
+
+PowerShell で:
+
+```powershell
+# %USERPROFILE%\bin にインストール
+cargo install --path . --root $HOME
+
+# ビルドだけする場合 → target\release\genpasswd_ex.exe
 cargo build --release
 ```
 
-バイナリは `target/release/genpasswd_ex` に生成されます。
+`%USERPROFILE%\bin` をユーザー環境変数 `Path` に追加すると、どこからでも `genpasswd_ex` で実行できます。
 
-### ターゲット別ビルド（macOS / Windows）
+#### macOS からクロスコンパイルする
 
-`.cargo/config.toml` にエイリアスを定義しています。
-
-| コマンド | ターゲット | 出力先 |
-|---|---|---|
-| `cargo build-mac` | macOS (Apple Silicon) | `target/aarch64-apple-darwin/release/genpasswd_ex` |
-| `cargo build-win` | Windows (x86_64) | `target/x86_64-pc-windows-gnu/release/genpasswd_ex.exe` |
-
-macOS から Windows 版をクロスコンパイルするには、事前に次の準備が必要です。
+初回のみ準備が必要です:
 
 ```
 brew install mingw-w64
 rustup target add x86_64-pc-windows-gnu
 ```
 
-Windows 上でビルドする場合は、Rust と Visual Studio Build Tools（C++）を入れて `cargo build --release` を実行してください（`target\release\genpasswd_ex.exe` に生成されます）。
+ビルド:
+
+```
+cargo build-win   # → target/x86_64-pc-windows-gnu/release/genpasswd_ex.exe
+```
+
+生成された `genpasswd_ex.exe` を Windows にコピーし、`Path` の通ったフォルダに置いて使います（単体で動作し、追加の DLL は不要です）。
+
+### ビルド用エイリアス
+
+`cargo build-mac` / `cargo build-win` は `.cargo/config.toml` に定義したエイリアスです。
+
+`--target` を付けない `cargo build --release` は、**ビルドしているマシン自身（ホスト）向け**のバイナリになり、`target/release/` に出力されます（Apple Silicon の Mac なら `aarch64-apple-darwin`、Windows なら通常 `x86_64-pc-windows-msvc`）。`cargo build-mac` との違いはターゲットを明示するかどうかと出力先だけで、Apple Silicon の Mac 上ではどちらも同じ Mac 用バイナリになります。
+
+| コマンド | ターゲット | 出力先 |
+|---|---|---|
+| `cargo build-mac` | macOS (Apple Silicon) | `target/aarch64-apple-darwin/release/genpasswd_ex` |
+| `cargo build-win` | Windows (x86_64) | `target/x86_64-pc-windows-gnu/release/genpasswd_ex.exe` |
 
 ## データ保存先
 
