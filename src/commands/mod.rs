@@ -10,6 +10,9 @@ pub mod list;
 pub mod remove;
 pub mod rename;
 pub mod save;
+pub mod tag;
+pub mod tags;
+pub mod untag;
 pub mod update;
 
 use crate::{clipboard, crypto, db, password};
@@ -55,6 +58,39 @@ fn copy_to_clipboard(pwd: &str) {
 /// 暗号化鍵を読み込む（失敗したら終了）
 fn load_cipher() -> crypto::Cipher {
     crypto::Cipher::load().unwrap_or_else(|e| exit_with_error(e))
+}
+
+/// タグ指定から先頭の `#` を 1 つ取り除き、前後の空白を除去する（`-t '#stg'` も `stg` として扱う）
+fn strip_tag(tag: &str) -> &str {
+    let tag = tag.trim();
+    tag.strip_prefix('#').unwrap_or(tag).trim()
+}
+
+/// コマンドラインで指定されたタグを検証して整える（空・カンマ入り・空白入りはエラー、重複は除去）
+fn normalize_tags(tags: Vec<String>) -> Vec<String> {
+    let mut result: Vec<String> = Vec::new();
+    for tag in tags {
+        let tag = strip_tag(&tag).to_string();
+        if tag.is_empty() {
+            exit_with_error("tag must not be empty.");
+        }
+        if tag.contains(',') {
+            exit_with_error(format!("tag must not contain a comma: \"{}\".", tag));
+        }
+        // `#a #b` 形式で表示するため、空白を含むタグは区切りが分からなくなるので不可
+        if tag.chars().any(char::is_whitespace) {
+            exit_with_error(format!("tag must not contain whitespace: \"{}\".", tag));
+        }
+        if !result.contains(&tag) {
+            result.push(tag);
+        }
+    }
+    result
+}
+
+/// タグを `#a #b` 形式にする（タグなしは空文字）
+fn format_tags(tags: &[String]) -> String {
+    tags.iter().map(|t| format!("#{}", t)).collect::<Vec<_>>().join(" ")
 }
 
 /// DB を開く

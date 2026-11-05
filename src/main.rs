@@ -37,8 +37,8 @@ fn main() {
         Some(Command::Add { service, password, username }) => commands::add::run(service, password, username),
 
         // ---- 参照 ----
-        // 履歴表示（-s 省略時は全サービスをマスク表示）
-        Some(Command::History { service }) => commands::history::run(service),
+        // 履歴表示（-s 省略時は全サービスをマスク表示、-t でタグ絞り込み）
+        Some(Command::History { service, tag }) => commands::history::run(service, tag),
         // 指定 ID のパスワードをクリップボードへ
         Some(Command::Copy { id }) => commands::copy::run(id),
         // サービス一覧と件数
@@ -51,6 +51,14 @@ fn main() {
         Some(Command::Rename { service, new_service, merge }) => commands::rename::run(service, new_service, merge),
         // 旧形式（平文）のパスワードを一括暗号化
         Some(Command::Encrypt) => commands::encrypt::run(),
+
+        // ---- タグ ----
+        // サービスにタグを付ける
+        Some(Command::Tag { service, tags }) => commands::tag::run(service, tags),
+        // サービスからタグを外す
+        Some(Command::Untag { service, tags }) => commands::untag::run(service, tags),
+        // タグごとのサービス一覧
+        Some(Command::Tags) => commands::tags::run(),
 
         // ---- 削除 ----
         // 1 件削除

@@ -10,12 +10,15 @@ use clap::{ArgGroup, Parser, Subcommand};
     after_help = "Examples:
   genpasswd_ex save -s <SERVICE> -u <USERNAME> [-l <LENGTH>] [-k] [-n]
   genpasswd_ex add -s <SERVICE> '<PASSWORD>' -u <USERNAME>
-  genpasswd_ex history [-s <SERVICE>]
+  genpasswd_ex history [-s <SERVICE> | -t <TAG>[,<TAG>...]...]
   genpasswd_ex copy <ID>
   genpasswd_ex rename -s <SERVICE> <NEW_SERVICE>
   genpasswd_ex remove <ID>
   genpasswd_ex delete -s <SERVICE>
   genpasswd_ex update <ID> [-u <USERNAME>] [-p '<PASSWORD>']
+  genpasswd_ex tag -s <SERVICE> <TAG>...
+  genpasswd_ex untag -s <SERVICE> <TAG>...
+  genpasswd_ex tags
 
 Passwords are encrypted with a key stored in the OS key store
 (macOS: Keychain / Windows: Credential Manager; otherwise set GENPASSWD_EX_KEY).
@@ -64,6 +67,9 @@ pub enum Command {
         /// Service name (omit to show all services; passwords are masked)
         #[arg(short, long)]
         service: Option<String>,
+        /// Show only services with the tag (repeat for OR, join with commas for AND: -t common -t nx,stg)
+        #[arg(short, long, conflicts_with = "service")]
+        tag: Vec<String>,
     },
     /// Copy the password of a history entry to the clipboard
     Copy {
@@ -116,6 +122,26 @@ pub enum Command {
         /// Entry ID (shown in `history`)
         id: i64,
     },
+    /// Add tags to a service (-s <SERVICE> <TAG>...)
+    Tag {
+        /// Service name
+        #[arg(short, long)]
+        service: String,
+        /// Tags to add
+        #[arg(required = true)]
+        tags: Vec<String>,
+    },
+    /// Remove tags from a service (-s <SERVICE> <TAG>...)
+    Untag {
+        /// Service name
+        #[arg(short, long)]
+        service: String,
+        /// Tags to remove
+        #[arg(required = true)]
+        tags: Vec<String>,
+    },
+    /// List tags and the services they are attached to
+    Tags,
     /// Delete all history for a service (-s <SERVICE>)
     Delete {
         /// Service name

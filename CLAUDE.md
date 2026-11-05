@@ -15,7 +15,7 @@
 
 ## DB
 
-- テーブル: `password_history (id, service, username, password, created_at)`
+- テーブル: `password_history (id, service, username, password, created_at)`、`service_tags (service, tag)`（PK は (service, tag)。タグはサービス単位）
 - 保存先:
   - release ビルド: `~/.local/share/genpasswd_ex/history.db`（Windows は `%APPDATA%\genpasswd_ex\history.db`）
   - debug ビルド（`cargo run`）: リポジトリ直下の `history_dev.db`
@@ -33,7 +33,9 @@
 - `history` は `-s` 省略（全サービス表示）時はパスワードを `********` でマスクし、復号しない（鍵も読まない）。`-s` 指定時は平文表示。
 - `copy <ID>` で指定IDのパスワードを復号してクリップボードにコピー（画面には表示しない。コピー失敗時はエラー終了）。
 - `remove <ID>` で履歴を1件削除。`delete -s <SERVICE>` はサービスの全履歴を削除。
-- `rename -s <OLD> <NEW>` でサービス名を変更。変更先に履歴がある場合はエラー（`--merge` で統合）。
+- `rename -s <OLD> <NEW>` でサービス名を変更。変更先に履歴がある場合はエラー（`--merge` で統合）。タグも引き継ぐ（統合時は和集合）。
+- `tag -s <SERVICE> <TAG>...` / `untag` / `tags` でサービスのタグを管理。`tag` は履歴のあるサービスのみ可、タグにカンマ・空白不可、指定時の先頭 `#` は除去。表示は `#a #b` 形式。`delete -s` でタグも削除（`remove` で最後の1件を消してもタグは残るが、履歴のないサービスのタグは表示・絞り込みの対象外）。
+- `history -t` でタグ絞り込み。`-t` の複数指定は OR、カンマ区切りは AND（例: `-t common -t nx,stg`）。`-s` とは併用不可、マスク表示。
 - `$` を含むパスワードはシェルで展開されるため、引数や SQL はシングルクォートで囲む（`sqlite3` はクォート付きヒアドキュメント `<<'EOF'` を使う）。
 
 ## 開発
